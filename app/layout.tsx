@@ -3,8 +3,8 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "V-RAE — Rethinking Video Latent Spaces for Generation",
-  description: "V-RAE builds compact generative video latents on frozen visual representations for reconstruction, generation, and predictive modeling.",
-  icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+  description: "V-RAE builds semantically structured video latents on frozen visual representations for reconstruction, generation, and predictive modeling.",
+  icons: { icon: "/favicon-v2.svg", shortcut: "/favicon-v2.svg" },
   openGraph: {
     title: "V-RAE — Rethinking Video Latent Spaces for Generation",
     description: "Semantic, temporally coherent video latents that are easier to generate.",

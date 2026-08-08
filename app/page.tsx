@@ -86,7 +86,11 @@ const reconstructionRows = [
   ["Wan2.2 VAE", "12.20", "4.76"],
   ["HunyuanVideo VAE", "7.73", "4.38"],
   ["CogVideoX VAE", "14.53", "8.11"],
+  ["Cosmos-0.1 (CV4×8×8)", "17.01", "9.88"],
   ["AToken", "8.17", "5.36"],
+  ["Open-MAGVIT2", "36.21", "17.16"],
+  ["OmniTokenizer VAE", "28.86", "15.35"],
+  ["LARP-L-long", "142.29", "125.00"],
   ["V-RAE · DINOv3", "7.88", "5.46"],
   ["V-RAE · EUPE", "10.43", "6.14"],
   ["V-RAE · SigLIP2", "9.82", "4.73"],
@@ -105,19 +109,39 @@ const generationRows = [
   ["V-RAE · V-JEPA 2.1", "118.32", "20.47"],
 ];
 
-const semanticRows = [
-  ["Wan2.2 VAE", 16.94, 41.86, 46.13],
-  ["AToken", 30.83, 45.05, 53.27],
-  ["V-RAE · DINOv3", 89.13, 66.55, 83.12],
-  ["V-RAE · EUPE", 90.16, 65.67, 82.21],
-  ["V-RAE · SigLIP2", 90.92, 65.39, 82.56],
-  ["V-RAE · V-JEPA 2.1", 86.65, 72.91, 80.7],
+type SemanticProbeRow = {
+  model: string;
+  compression: string;
+  family: "encoder" | "ours" | "vae";
+  ucf101: [number, number];
+  ssv2: [number, number];
+  k400: [number, number];
+};
+
+const semanticProbeRows: SemanticProbeRow[] = [
+  { model: "DINOv3-L", compression: "1×", family: "encoder", ucf101: [91.84, 91.84], ssv2: [69.92, 70.21], k400: [86.32, 87.15] },
+  { model: "V-RAE · DINOv3-L", compression: "4×", family: "ours", ucf101: [89.13, 88.94], ssv2: [66.55, 67.19], k400: [83.12, 84.36] },
+  { model: "EUPE-B", compression: "1×", family: "encoder", ucf101: [93.86, 93.78], ssv2: [67.17, 67.64], k400: [83.53, 84.21] },
+  { model: "V-RAE · EUPE-B", compression: "4×", family: "ours", ucf101: [90.16, 89.93], ssv2: [65.67, 66.21], k400: [82.21, 83.31] },
+  { model: "SigLIP2-L", compression: "1×", family: "encoder", ucf101: [94.05, 93.55], ssv2: [68.54, 68.80], k400: [86.00, 86.93] },
+  { model: "V-RAE · SigLIP2-L", compression: "4×", family: "ours", ucf101: [90.92, 90.88], ssv2: [65.39, 66.08], k400: [82.56, 83.91] },
+  { model: "V-JEPA 2.1-L", compression: "2×", family: "encoder", ucf101: [93.02, 92.83], ssv2: [76.58, 77.11], k400: [84.29, 85.20] },
+  { model: "V-RAE · V-JEPA 2.1-L", compression: "4×", family: "ours", ucf101: [86.65, 86.65], ssv2: [72.91, 73.50], k400: [80.70, 81.87] },
+  { model: "Wan2.2 VAE", compression: "4×", family: "vae", ucf101: [16.94, 16.29], ssv2: [41.86, 42.62], k400: [46.13, 48.11] },
+  { model: "AToken", compression: "4×", family: "vae", ucf101: [30.83, 30.29], ssv2: [45.05, 45.95], k400: [53.27, 55.32] },
+  { model: "CogVideoX VAE", compression: "4×", family: "vae", ucf101: [14.51, 14.14], ssv2: [37.03, 38.34], k400: [41.59, 43.53] },
 ];
+
+const semanticDatasets = [
+  { key: "ucf101", label: "UCF101", probe: "Linear probe" },
+  { key: "ssv2", label: "Something-Something V2", probe: "Attentive probe" },
+  { key: "k400", label: "Kinetics-400", probe: "Attentive probe" },
+] as const;
 
 function Mark() {
   return (
     <span className="brand-mark" aria-hidden="true">
-      <i /><i /><i /><i />
+      <i /><i /><i />
     </span>
   );
 }
@@ -129,12 +153,9 @@ function ArrowIcon() {
 function SectionHeader({ index, eyebrow, title, copy }: { index: string; eyebrow: string; title: string; copy: string }) {
   return (
     <div className="section-header reveal">
-      <div className="section-index">{index}</div>
-      <div>
-        <p className="eyebrow">{eyebrow}</p>
-        <h2>{title}</h2>
-        <p className="section-copy">{copy}</p>
-      </div>
+      <p className="section-label"><span>{index}</span>{eyebrow}</p>
+      <h2>{title}</h2>
+      <p className="section-copy">{copy}</p>
     </div>
   );
 }
@@ -221,6 +242,11 @@ function SyncVideoGrid({ videos, compact = false }: { videos: VideoItem[]; compa
 }
 
 function MetricTable({ title, rows, labels }: { title: string; rows: string[][]; labels: [string, string] }) {
+  const bestValues = [
+    Math.min(...rows.map((row) => Number(row[1]))),
+    Math.min(...rows.map((row) => Number(row[2]))),
+  ];
+
   return (
     <div className="metric-table-wrap reveal">
       <div className="metric-table-title">
@@ -233,17 +259,65 @@ function MetricTable({ title, rows, labels }: { title: string; rows: string[][];
           <tbody>
             {rows.map((row) => {
               const ours = row[0].startsWith("V-RAE");
-              const best = row[0].includes("V-JEPA");
+              const bestFirst = Number(row[1]) === bestValues[0];
+              const bestSecond = Number(row[2]) === bestValues[1];
               return (
-                <tr className={`${ours ? "ours-row" : ""} ${best ? "best-row" : ""}`} key={row[0]}>
+                <tr className={`${ours ? "ours-row" : ""} ${bestFirst || bestSecond ? "best-row" : ""}`} key={row[0]}>
                   <td>{row[0]}{ours && <span className="mini-ours">ours</span>}</td>
-                  <td>{row[1]}</td><td>{row[2]}{best && <span className="best-pill">best</span>}</td>
+                  <td>{row[1]}{bestFirst && <span className="best-pill">best</span>}</td>
+                  <td>{row[2]}{bestSecond && <span className="best-pill">best</span>}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function SemanticProbeChart() {
+  return (
+    <div className="probe-grid reveal">
+      {semanticDatasets.map((dataset) => (
+        <article className="probe-chart" key={dataset.key}>
+          <header>
+            <div>
+              <p>{dataset.probe}</p>
+              <h3>{dataset.label}</h3>
+            </div>
+            <span>Top-1 accuracy ↑</span>
+          </header>
+          <div className="probe-chart-legend" aria-label="Evaluation setting legend">
+            <span><i className="single" />Single clip</span>
+            <span><i className="tta" />TTA</span>
+          </div>
+          <div className="probe-axis" aria-hidden="true"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>
+          <div className="probe-rows">
+            {semanticProbeRows.map((row) => {
+              const [single, tta] = row[dataset.key];
+              return (
+                <div className={`probe-row ${row.family}`} key={row.model}>
+                  <div className="probe-model">
+                    <span>{row.model}</span>
+                    <small>{row.compression}</small>
+                  </div>
+                  <div className="probe-bars">
+                    <div className="probe-track" aria-label={`${row.model}, single clip: ${single.toFixed(2)} percent`}>
+                      <i className="probe-fill single" style={{ "--probe-value": `${single}%` } as React.CSSProperties} />
+                      <b>{single.toFixed(2)}</b>
+                    </div>
+                    <div className="probe-track" aria-label={`${row.model}, test-time augmentation: ${tta.toFixed(2)} percent`}>
+                      <i className="probe-fill tta" style={{ "--probe-value": `${tta}%` } as React.CSSProperties} />
+                      <b>{tta.toFixed(2)}</b>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </article>
+      ))}
     </div>
   );
 }
@@ -299,80 +373,81 @@ function App() {
 
   return (
     <main>
-      <nav className="site-nav" aria-label="Primary navigation">
-        <a className="nav-brand" href="#top"><Mark /><span>V-RAE</span></a>
-        <div className="nav-links">
-          <a href="#method">Method</a>
-          <a href="#results">Results</a>
-          <a href="#videos">Videos</a>
-          <a href="#tfvd">tFVD</a>
+      <header className="paper-hero" id="top">
+        <div className="paper-nav">
+          <a className="paper-brand" href="#top"><Mark /><span>V-RAE</span></a>
+          <div><a href="#method">Method</a><a href="#reconstruction">Results</a><a href="#citation">BibTeX</a></div>
         </div>
-        <a className="nav-paper" href="/vrae-paper.pdf" target="_blank">Paper <ArrowIcon /></a>
-      </nav>
-
-      <section className="hero" id="top">
-        <div className="hero-media" aria-hidden="true">
-          <img src="/assets/hero-cover.png" alt="" />
-          <span className="hero-vignette" />
-          <span className="hero-glow hero-glow-a" />
-          <span className="hero-glow hero-glow-b" />
-        </div>
-        <div className="hero-content">
-          <p className="hero-kicker reveal">Video Representation Autoencoder · 2026</p>
-          <h1 className="reveal"><span>V-RAE</span><small>Rethinking Video Latent Spaces<br />for Generation</small></h1>
-          <p className="hero-lede reveal">Compact generative video latents built on frozen vision foundation representations—semantic, temporally coherent, and easier to generate.</p>
-          <div className="hero-actions reveal">
-            <a className="button button-primary" href="/vrae-paper.pdf" target="_blank">Read the paper <ArrowIcon /></a>
-            <a className="button button-ghost" href="#videos">Watch comparisons <span aria-hidden="true">↓</span></a>
+        <div className="hero-grid">
+          <div className="hero-copy reveal">
+            <p className="hero-kicker">Video Representation Autoencoder · 2026</p>
+            <h1>V-RAE</h1>
+            <h2>Rethinking Video Latent Spaces for Generation</h2>
+            <p className="hero-lede">Introducing V-RAE, a video autoencoder that constructs generative latent spaces directly from frozen visual representations.</p>
+            <div className="hero-principles">
+              <div><span aria-hidden="true">◎</span><p><strong>Semantic latent space:</strong> frozen visual encoders provide structured representations for reconstruction, generation, and prediction.</p></div>
+              <div><span aria-hidden="true">⇲</span><p><strong>Video-specific compression:</strong> temporal attention pooling removes redundancy while a causal decoder reconstructs continuous motion.</p></div>
+              <div><span aria-hidden="true">✦</span><p><strong>Generation-oriented design:</strong> V-RAE improves generation quality and converges up to 6× faster under matched settings.</p></div>
+            </div>
+            <div className="hero-actions hero-resource-actions" aria-label="Project resources">
+              <button className="resource-button resource-button-primary" type="button" disabled title="Coming soon" aria-label="arXiv — coming soon">
+                <span className="resource-icon" aria-hidden="true"><img src="/assets/logo-arxiv.svg" alt="" /></span>
+                <span>arXiv</span>
+              </button>
+              <button className="resource-button" type="button" disabled title="Coming soon" aria-label="Code — coming soon">
+                <span className="resource-icon" aria-hidden="true"><img src="/assets/logo-github.svg" alt="" /></span>
+                <span>Code</span>
+              </button>
+              <button className="resource-button" type="button" disabled title="Coming soon" aria-label="Models — coming soon">
+                <span className="resource-icon" aria-hidden="true"><img src="/assets/logo-huggingface.svg" alt="" /></span>
+                <span>Models</span>
+              </button>
+            </div>
           </div>
-          <p className="hero-authors reveal">Minghui Guo · Shengqiong Wu · Hao Fei · Saining Xie</p>
-          <p className="hero-affiliations reveal">National University of Singapore · University of Oxford · New York University</p>
+          <figure className="hero-teaser reveal">
+            <img src="/assets/hero-cover.png" alt="V-RAE teaser showing a structured video representation space" />
+          </figure>
         </div>
-        <div className="hero-metrics">
-          <div><strong>2.67</strong><span>K600 rFVD ↓</span></div>
-          <div><strong>20.47</strong><span>K600 gFVD ↓</span></div>
-          <div><strong>6×</strong><span>faster convergence</span></div>
-          <div><strong>0.897</strong><span>tFVD ↔ gFVD</span></div>
-        </div>
-        <a href="#premise" className="scroll-cue" aria-label="Scroll to the premise"><span />Discover</a>
+      </header>
+
+      <section className="paper-meta" aria-label="Paper authors and affiliations">
+        <p className="paper-authors">Minghui Guo<sup>1</sup>, Shengqiong Wu<sup>2</sup>, Hao Fei<sup>2</sup>, Saining Xie<sup>3</sup></p>
+        <p className="paper-affiliations"><span><sup>1</sup>National University of Singapore</span><span><sup>2</sup>University of Oxford</span><span><sup>3</sup>New York University</span></p>
       </section>
 
-      <section className="premise dark-section" id="premise">
-        <div className="ambient ambient-one" aria-hidden="true" />
-        <div className="ambient ambient-two" aria-hidden="true" />
+      <section className="project-summary" id="overview">
         <div className="shell">
-          <p className="eyebrow reveal">The premise</p>
-          <h2 className="statement reveal">The best latent space for <em>reconstruction</em><br />is not necessarily the best one for <span>generation.</span></h2>
-          <p className="statement-support reveal">A video generator should model how visual states evolve—not rediscover objects, actions, and scene structure from reconstruction-first codes.</p>
-          <div className="latent-compare">
-            <article className="latent-card latent-card--vae reveal">
-              <div className="latent-visual vae-visual" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>
-              <p className="card-label">Conventional VAE latent</p>
-              <h3>Pixel-faithful.<br />Locally irregular.</h3>
-              <p>Optimized to recover observed samples, but not necessarily the space between them.</p>
-            </article>
-            <article className="latent-card latent-card--vrae reveal">
-              <div className="latent-visual vrae-visual" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /><i /></div>
-              <p className="card-label">V-RAE latent</p>
-              <h3>Semantic.<br />Temporally smooth.</h3>
-              <p>Anchored in pretrained representations, then compressed without discarding structure.</p>
-            </article>
+          <div className="project-tldr reveal"><strong>TL;DR:</strong> V-RAE turns frozen visual representations into video generative latents—preserving semantics under temporal compression while supporting competitive reconstruction, better generation, faster optimization, and future prediction.</div>
+          <div className="key-point-list reveal">
+            <article><i aria-hidden="true">◎</i><p><strong>Semantic preservation.</strong> V-RAE retains substantially richer task-relevant information than conventional VAE latents, reaching 90.92% on UCF101, 72.91% on SSv2, and 83.12% on K400 after temporal compression.</p></article>
+            <article><i aria-hidden="true">✦</i><p><strong>Better and faster generation.</strong> Under the same 1,280-token budget, every V-RAE variant improves gFVD over the evaluated VAE latent spaces, with up to 3× faster convergence on UCF101 and 6× on K600.</p></article>
+            <article><i aria-hidden="true">∿</i><p><strong>Reconstruction is not the whole story.</strong> rFVD and gFVD produce markedly different tokenizer rankings, while tFVD better captures temporal smoothness and decoder robustness along off-trajectory latent states.</p></article>
+            <article><i aria-hidden="true">→</i><p><strong>A predictive state space.</strong> The same semantic latent interface supports future-state prediction and pixel reconstruction, reducing structural and identity drift on Cityscapes.</p></article>
           </div>
+          <nav className="jump-nav" aria-label="Project sections">
+            <a href="#method"><i aria-hidden="true">⇲</i><span>Method</span></a>
+            <a href="#results"><i aria-hidden="true">◇</i><span>Overview</span></a>
+            <a href="#reconstruction"><i aria-hidden="true">▣</i><span>Reconstruction</span></a>
+            <a href="#semantics"><i aria-hidden="true">◎</i><span>Semantics</span></a>
+            <a href="#videos"><i aria-hidden="true">✦</i><span>Generation</span></a>
+            <a href="#prediction"><i aria-hidden="true">→</i><span>Prediction</span></a>
+          </nav>
+          <p className="jump-hint">Select a topic to jump to the corresponding section.</p>
         </div>
       </section>
 
       <section className="section method" id="method">
         <div className="shell">
-          <SectionHeader index="01" eyebrow="Architecture" title="Start from representations, not reconstruction codes." copy="A frozen visual representation encoder supplies semantic structure. Lightweight temporal pooling removes redundancy, while a chunk-wise causal decoder reconstructs continuous motion." />
-          <div className="method-steps reveal">
-            <article><span>01</span><b>Frozen representation</b><p>DINOv3 · SigLIP2 · EUPE · V-JEPA 2.1</p></article>
-            <article><span>02</span><b>Temporal pooling</b><p>Dense features → 4× compact latent sequence</p></article>
-            <article><span>03</span><b>Causal decoding</b><p>3D RoPE · chunk-wise history · multi-frame output</p></article>
-          </div>
+          <SectionHeader index="01" eyebrow="Method" title="Video Representation Autoencoder (V-RAE)" copy="A frozen visual representation encoder supplies semantic structure. Temporal attention pooling removes temporal redundancy, and a chunk-wise causal decoder reconstructs continuous motion." />
           <figure className="paper-figure method-figure reveal">
             <img src="/assets/V-RAE-2.webp" alt="V-RAE architecture with a frozen visual representation encoder, temporal pooling and causal video decoder" />
-            <figcaption><span>Figure 1</span> V-RAE architecture. Only the temporal pooling module and decoder are trained.</figcaption>
+            <figcaption><span>Figure 2</span> V-RAE architecture. Only the temporal pooling module and decoder are trained.</figcaption>
           </figure>
+          <div className="method-steps reveal">
+            <article><span>01</span><b>Frozen representation</b><p>DINOv3 · SigLIP2 · EUPE · V-JEPA 2.1</p></article>
+            <article><span>02</span><b>Temporal pooling</b><p>Dense features → 4× temporally compressed latent sequence</p></article>
+            <article><span>03</span><b>Causal decoding</b><p>3D RoPE · chunk-wise history · multi-frame output</p></article>
+          </div>
           <div className="encoder-strip reveal" aria-label="Supported frozen encoders">
             <span>Image-native</span><b>DINOv3</b><b>SigLIP2</b><b>EUPE</b><i />
             <span>Video-native</span><b>V-JEPA 2.1</b>
@@ -382,50 +457,77 @@ function App() {
 
       <section className="section overview-section" id="results">
         <div className="shell">
-          <SectionHeader index="02" eyebrow="At a glance" title="One latent space. Four advantages." copy="V-RAE combines competitive reconstruction, substantially richer semantics, better downstream generation, and faster optimization under matched settings." />
-          <div className="overview-frame reveal">
-            <img src="/assets/V-RAE-overall.webp" alt="Radar comparison and K600 gFVD convergence curves" />
+          <SectionHeader index="02" eyebrow="Overview" title="One representation space for reconstruction, generation, and prediction" copy="V-RAE studies whether frozen visual representations can define a video latent space that remains reconstructive, semantic, generative, and predictive under matched downstream settings." />
+          <div className="thesis-callout reveal">
+            <span>Research question</span>
+            <p>The best latent space for <em>reconstruction</em> is not necessarily the best one for <strong>generation.</strong></p>
           </div>
-          <div className="result-principles reveal">
-            <div><span>01</span><strong>Compact</strong><p>4× temporal and 16×16 spatial compression.</p></div>
-            <div><span>02</span><strong>Semantic</strong><p>Up to 90.92% UCF101 probing accuracy.</p></div>
-            <div><span>03</span><strong>Generative</strong><p>20.47 K600 gFVD with V-JEPA 2.1.</p></div>
-            <div><span>04</span><strong>Predictive</strong><p>Stronger future-video modeling on Cityscapes.</p></div>
+          <figure className="paper-figure overview-frame reveal">
+            <img src="/assets/V-RAE-overall.webp" alt="Radar comparison and K600 gFVD convergence curves" />
+            <figcaption><span>Figure 1</span> <b>V-RAE overview.</b> Left: normalized comparison of reconstruction, generation, compression, and semantic performance across representative video tokenizers. Right: gFVD convergence on K600 under matched training settings.</figcaption>
+          </figure>
+          <div className="result-principles advantage-grid reveal">
+            <div>
+              <div className="advantage-top"><span>01</span><i aria-hidden="true">◎</i></div>
+              <strong>Semantic</strong>
+              <p>Up to 90.92% UCF101, 72.91% SSv2, and 83.12% K400 probing accuracy.</p>
+            </div>
+            <div>
+              <div className="advantage-top"><span>02</span><i aria-hidden="true">✦</i></div>
+              <strong>Generative</strong>
+              <p>118.32 UCF101 gFVD and 20.47 K600 gFVD with V-JEPA 2.1.</p>
+            </div>
+            <div>
+              <div className="advantage-top"><span>03</span><i aria-hidden="true">↗</i></div>
+              <strong>Training efficiency</strong>
+              <p>Up to 3× faster convergence on UCF101 and 6× faster on K600.</p>
+            </div>
+            <div>
+              <div className="advantage-top"><span>04</span><i aria-hidden="true">▣</i></div>
+              <strong>Reconstruction</strong>
+              <p>6.86 UCF101 rFVD and 2.67 K600 rFVD with V-JEPA 2.1.</p>
+            </div>
           </div>
         </div>
       </section>
 
       <section className="section reconstruction" id="reconstruction">
         <div className="shell">
-          <SectionHeader index="03" eyebrow="Reconstruction" title="Faithful motion, without giving up semantics." copy="V-RAE reaches 2.67 rFVD on K600 and remains competitive on UCF101 while its latents preserve far more task-relevant information than conventional video tokenizer latents." />
+          <SectionHeader index="03" eyebrow="Reconstruction" title="Reconstructing videos from semantic latents" copy="V-RAE with V-JEPA 2.1 achieves 6.86 rFVD on UCF101 and 2.67 rFVD on K600. The table reports all evaluated video tokenizer baselines under the paper's reconstruction protocol." />
+          <div className="section-points reveal">
+            <p><strong>Competitive video reconstruction.</strong> Frozen semantic representations can recover continuous video without re-optimizing the encoder for low-level pixels.</p>
+            <p><strong>Video pretraining helps.</strong> V-JEPA 2.1 provides the strongest V-RAE reconstruction results on both datasets, suggesting that native spatiotemporal priors are especially useful for decoding motion.</p>
+          </div>
           <div className="case-toolbar reveal">
             <div><span>Reconstruction case</span>{reconstructionCases.map((item) => <button className={reconCase === item ? "active" : ""} key={item} onClick={() => setReconCase(item)}>0{item}</button>)}</div>
             <p>All videos share the same 8 FPS timeline.</p>
           </div>
           <div className="reveal"><SyncVideoGrid videos={reconstructionVideos(reconCase)} compact /></div>
-          <div className="two-col-tables">
+          <div className="reconstruction-table-single">
             <MetricTable title="Reconstruction fidelity" rows={reconstructionRows} labels={["UCF101 rFVD", "K600 rFVD"]} />
-            <div className="semantic-panel reveal">
-              <div className="metric-table-title"><h3>Semantic probing</h3><span>Top-1 accuracy ↑</span></div>
-              <div className="semantic-legend"><span>UCF101</span><span>SSv2</span><span>K400</span></div>
-              {semanticRows.map(([name, ucf, ssv2, k400]) => (
-                <div className={`semantic-row ${String(name).startsWith("V-RAE") ? "ours" : ""}`} key={String(name)}>
-                  <span>{name}</span>
-                  <div style={{ "--ucf": `${ucf}%`, "--ssv": `${ssv2}%`, "--k4": `${k400}%` } as React.CSSProperties}>
-                    <i className="bar-ucf" /><i className="bar-ssv" /><i className="bar-k4" />
-                  </div>
-                  <b>{ucf}</b>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </section>
 
-      <section className="section generation dark-section" id="videos">
-        <div className="ambient ambient-three" aria-hidden="true" />
+      <section className="section semantics" id="semantics">
         <div className="shell shell-wide">
-          <SectionHeader index="04" eyebrow="Class-conditional generation" title="Better targets. Learned faster." copy="Under the same 1,280-token budget, every V-RAE variant outperforms the evaluated conventional video tokenizer latent spaces on both datasets." />
+          <SectionHeader index="04" eyebrow="Semantic probing" title="Semantic information after temporal compression" copy="The charts report every value from the paper's probing table: single-clip and test-time-augmentation accuracy on UCF101, Something-Something V2, and Kinetics-400 for frozen encoders, V-RAE variants, and VAE-based tokenizers." />
+          <div className="section-points reveal">
+            <p><strong>Large margins over VAE latents.</strong> Temporally compressed V-RAE features remain highly discriminative, while conventional reconstruction latents retain far less semantic information.</p>
+            <p><strong>Compression preserves encoder character.</strong> The relative strengths of DINOv3, EUPE, SigLIP2, and V-JEPA 2.1 remain visible after compression across action and motion-centric benchmarks.</p>
+          </div>
+          <SemanticProbeChart />
+          <p className="probe-note reveal">All probes operate on the same compressed patch tokens used for downstream generation. V-RAE retains the semantic structure of its frozen encoder while using a 4× temporal compression ratio.</p>
+        </div>
+      </section>
+
+      <section className="section generation" id="videos">
+        <div className="shell shell-wide">
+          <SectionHeader index="05" eyebrow="Class-conditional generation" title="Better generation targets, learned faster" copy="Under the same 1,280-token budget, every V-RAE variant outperforms the evaluated conventional video tokenizer latent spaces on both datasets." />
+          <div className="section-points reveal">
+            <p><strong>Semantic structure improves the target distribution.</strong> The generator can focus on how objects and actions evolve instead of rediscovering scene semantics from reconstruction-oriented codes.</p>
+            <p><strong>V-JEPA 2.1 is strongest overall.</strong> It reaches 118.32 gFVD on UCF101 and 20.47 on K600, while V-RAE variants consistently improve over the evaluated VAE baselines.</p>
+          </div>
           <div className="generation-toolbar reveal">
             <div className="segmented" aria-label="Dataset">
               {(Object.keys(generationData) as (keyof typeof generationData)[]).map((item) => <button key={item} className={dataset === item ? "active" : ""} onClick={() => switchDataset(item)}>{item}</button>)}
@@ -435,23 +537,23 @@ function App() {
             </div>
           </div>
           <div className="reveal"><SyncVideoGrid videos={[...activeGenerationVideos]} /></div>
-          <div className="generation-evidence">
+          <div className="generation-evidence generation-evidence-single">
             <MetricTable title="Controlled generation" rows={generationRows} labels={["UCF101 gFVD", "K600 gFVD"]} />
-            <div className="convergence-card reveal">
-              <div className="speed-callout"><span>up to</span><strong>6×</strong><p>faster convergence</p></div>
-              <img src="/assets/k600_convergence.webp" alt="K600 gFVD convergence curves comparing V-RAE with Wan video VAEs" />
-            </div>
           </div>
-          <div className="chart-pair">
+          <div className="chart-pair convergence-pair">
             <figure className="paper-figure reveal"><img src="/assets/ucf101_convergence.webp" alt="UCF101 convergence curve" /><figcaption><span>UCF101</span> V-RAE reaches the Wan2.2 endpoint in roughly one third of the updates.</figcaption></figure>
-            <figure className="paper-figure reveal"><img src="/assets/vrae_six_model_radar.webp" alt="Comparison of reconstruction, generation, semantics and compression" /><figcaption><span>Holistic view</span> Generation quality tracks semantic organization more closely than reconstruction alone.</figcaption></figure>
+            <figure className="paper-figure reveal"><img src="/assets/k600_convergence.webp" alt="K600 convergence curve" /><figcaption><span>K600</span> V-RAE reaches matched quality with up to six times fewer training updates.</figcaption></figure>
           </div>
         </div>
       </section>
 
       <section className="section tfvd" id="tfvd">
         <div className="shell">
-          <SectionHeader index="05" eyebrow="A generation-oriented diagnostic" title="Measure the path, not only the endpoints." copy="tFVD replaces interior latent codes with local temporal midpoints, then asks whether the decoder can still recover plausible, coherent motion." />
+          <SectionHeader index="06" eyebrow="A generation-oriented diagnostic" title="Measure the path, not only the endpoints" copy="tFVD replaces interior latent codes with local temporal midpoints, then asks whether the decoder can still recover plausible, coherent motion." />
+          <div className="section-points reveal">
+            <p><strong>rFVD tests encoded inputs.</strong> It does not reveal whether the decoder remains stable when generated latents deviate from the exact encoding trajectory.</p>
+            <p><strong>tFVD probes the latent path.</strong> Temporal interpolation directly stresses local smoothness and decoder robustness, producing a much stronger correlation with downstream gFVD.</p>
+          </div>
           <div className="tfvd-intro">
             <figure className="paper-figure reveal"><img src="/assets/tFVD_method.webp" alt="tFVD computation by temporal latent interpolation" /><figcaption><span>tFVD</span> A controlled stress test of local temporal geometry and decoder stability.</figcaption></figure>
             <div className="metric-switch reveal">
@@ -469,9 +571,13 @@ function App() {
         </div>
       </section>
 
-      <section className="section prediction">
+      <section className="section prediction" id="prediction">
         <div className="shell">
-          <SectionHeader index="06" eyebrow="Future video prediction" title="A latent space that can imagine what comes next." copy="With the same conditional DiT and training budget on Cityscapes, V-RAE better preserves scene geometry, object identity, and motion trajectories over longer prediction horizons." />
+          <SectionHeader index="07" eyebrow="Future video prediction" title="A latent space that can imagine what comes next" copy="With the same conditional DiT and training budget on Cityscapes, V-RAE better preserves scene geometry, object identity, and motion trajectories over longer prediction horizons." />
+          <div className="section-points reveal">
+            <p><strong>Predict semantics, then render pixels.</strong> The predictor learns transitions between structured visual states while the V-RAE decoder maps those predicted states back to video.</p>
+            <p><strong>Temporal geometry matters more than rFVD.</strong> Despite weaker reconstruction fidelity on this setting, V-RAE achieves lower tFVD and substantially better future-video gFID and gFVD.</p>
+          </div>
           <div className="prediction-metrics reveal">
             <div><span>gFID ↓</span><del>15.02</del><strong>11.52</strong></div>
             <div><span>gFVD ↓</span><del>144.47</del><strong>111.36</strong></div>
@@ -488,7 +594,7 @@ function App() {
         <div className="shell">
           <div className="footer-title reveal"><Mark /><p>V-RAE</p><h2>Rethinking Video Latent Spaces for Generation</h2></div>
           <div className="footer-grid">
-            <div className="authors-card reveal"><p>Minghui Guo<sup>1</sup> · Shengqiong Wu<sup>2</sup> · Hao Fei<sup>2</sup> · Saining Xie<sup>3</sup></p><span><sup>1</sup>National University of Singapore</span><span><sup>2</sup>University of Oxford</span><span><sup>3</sup>New York University</span><div><a href="/vrae-paper.pdf" target="_blank">Paper <ArrowIcon /></a><button type="button" disabled>Code · coming soon</button></div></div>
+            <div className="authors-card reveal"><p>Minghui Guo<sup>1</sup> · Shengqiong Wu<sup>2</sup> · Hao Fei<sup>2</sup> · Saining Xie<sup>3</sup></p><span><sup>1</sup>National University of Singapore</span><span><sup>2</sup>University of Oxford</span><span><sup>3</sup>New York University</span><div><button type="button" disabled>Paper · coming soon</button><button type="button" disabled>Code · coming soon</button></div></div>
             <div className="bib-card reveal"><div><span>BibTeX</span><button type="button" onClick={copyBibtex}>{copied ? "Copied" : "Copy"}</button></div><pre>{bibtex}</pre></div>
           </div>
           <div className="footer-bottom"><p>Semantic representations for reconstruction, generation, and predictive modeling.</p><a href="#top">Back to top ↑</a></div>

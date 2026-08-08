@@ -39,3 +39,8 @@ yarn-error.log*
 /outputs/
 /work/
 *.tsbuildinfo
+
+# Local source copies; the optimized website videos live in public/videos.
+/k600_videogen_case/
+/reconstruction_case/
+/ucf101_videogen_case/
