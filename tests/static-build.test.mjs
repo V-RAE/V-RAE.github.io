@@ -15,8 +15,8 @@ test("the production build contains the V-RAE homepage and animated case studies
   );
   const bundledSource = scripts.join("\n");
 
-  assert.match(bundledSource, /video-reconstruction-comparison\.gif/);
-  assert.match(bundledSource, /class-conditional-video-generation-k600\.gif/);
-  assert.match(bundledSource, /class-conditional-video-generation-ucf101\.gif/);
-  assert.match(bundledSource, /world-model-future-prediction\.gif/);
+  assert.match(bundledSource, /video-reconstruction-comparison\.mp4/);
+  assert.match(bundledSource, /class-conditional-video-generation-k600\.mp4/);
+  assert.match(bundledSource, /class-conditional-video-generation-ucf101\.mp4/);
+  assert.match(bundledSource, /world-model-future-prediction\.mp4/);
 });

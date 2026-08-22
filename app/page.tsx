@@ -236,10 +236,46 @@ function FigureArtwork({ src, alt }: { src: string; alt: string }) {
   return <img className="figure-artwork" src={src} alt={alt} loading="lazy" />;
 }
 
-function DemoGif({ src, alt }: { src: string; alt: string }) {
+function DemoVideo({
+  src,
+  title,
+  alt,
+  width,
+  height,
+  titleHeight,
+  labels = [],
+  labelHeight = 0,
+}: {
+  src: string;
+  title: string;
+  alt: string;
+  width: number;
+  height: number;
+  titleHeight: number;
+  labels?: string[];
+  labelHeight?: number;
+}) {
   return (
-    <figure className="demo-gif reveal">
-      <img src={src} alt={alt} loading="lazy" decoding="async" />
+    <figure className="demo-gif video-demo reveal">
+      <div className="generation-demo-surface">
+        <header className="generation-demo-header" style={{ aspectRatio: `${width} / ${titleHeight}` }}>
+          <h3>{title}</h3>
+          <span className="generation-demo-rule" aria-hidden="true" />
+        </header>
+        {labels.length > 0 && (
+          <div
+            className="generation-demo-labels"
+            style={{ aspectRatio: `${width} / ${labelHeight}`, gridTemplateColumns: `repeat(${labels.length}, 1fr)` }}
+          >
+            {labels.map((label) => (
+              <span className={label.includes("V-RAE") || label === "RAEv2" ? "accent" : ""} key={label}>{label}</span>
+            ))}
+          </div>
+        )}
+        <div className="generation-demo-stage">
+          <video src={src} aria-label={alt} autoPlay muted loop playsInline preload="auto" style={{ aspectRatio: `${width} / ${height}` }} />
+        </div>
+      </div>
     </figure>
   );
 }
@@ -719,9 +755,15 @@ function App() {
       <section className="section reconstruction" id="reconstruction">
         <div className="shell">
           <SectionHeader index="03" eyebrow="Reconstruction" title="Reconstructing videos from semantic latents" copy="V-RAE with DINOv3 achieves 6.12 rFVD on UCF101, while V-JEPA 2.1 reaches 2.13 rFVD on K600. The table reports all evaluated video tokenizer baselines under the paper's reconstruction protocol." />
-          <DemoGif
-            src="/assets/demos/video-reconstruction-comparison.gif"
+          <DemoVideo
+            src="/assets/demos/video-reconstruction-comparison.mp4"
+            title="Video Reconstruction"
             alt="Animated comparison of ground-truth videos with RAEv2, Wan 2.2 VAE, and V-RAE reconstructions"
+            width={1094}
+            height={836}
+            titleHeight={95}
+            labels={["Ground Truth", "RAEv2", "WAN 2.2 VAE", "V-RAE (EUPE)"]}
+            labelHeight={45}
           />
           <div className="reconstruction-table-single">
             <MetricTable title="Reconstruction fidelity" rows={reconstructionRows} labels={["UCF101 rFVD", "K600 rFVD"]} />
@@ -746,13 +788,21 @@ function App() {
         </div>
         <div className="shell shell-wide">
           <div className="generation-gifs">
-            <DemoGif
-              src="/assets/demos/class-conditional-video-generation-k600.gif"
+            <DemoVideo
+              src="/assets/demos/class-conditional-video-generation-k600.mp4"
+              title="Class-Conditional Video Generation (K600)"
               alt="Animated grid of V-RAE class-conditional video generation examples on Kinetics 600"
+              width={1248}
+              height={794}
+              titleHeight={123}
             />
-            <DemoGif
-              src="/assets/demos/class-conditional-video-generation-ucf101.gif"
+            <DemoVideo
+              src="/assets/demos/class-conditional-video-generation-ucf101.mp4"
+              title="Class-Conditional Video Generation (UCF101)"
               alt="Animated grid of V-RAE class-conditional video generation examples on UCF101"
+              width={1248}
+              height={794}
+              titleHeight={123}
             />
           </div>
           <div className="generation-evidence generation-evidence-single">
@@ -793,9 +843,15 @@ function App() {
             <div><span>gFVD ↓</span><del>144.47</del><strong>111.36</strong></div>
             <p>Only the latent representation changes.</p>
           </div>
-          <DemoGif
-            src="/assets/demos/world-model-future-prediction.gif"
+          <DemoVideo
+            src="/assets/demos/world-model-future-prediction.mp4?v=tracked-clipped"
+            title="Future Prediction"
             alt="Animated Cityscapes comparison of ground truth, Wan 2.2 predictions, and V-RAE future video predictions"
+            width={1208}
+            height={936}
+            titleHeight={95}
+            labels={["Ground Truth", "WAN 2.2", "V-RAE"]}
+            labelHeight={45}
           />
           <div className="world-table reveal"><table><thead><tr><th>Latent space</th><th>rFVD ↓</th><th>tFVD ↓</th><th>gFID ↓</th><th>gFVD ↓</th></tr></thead><tbody><tr><td>Wan2.2 VAE</td><td>7.03</td><td>319.02</td><td>15.02</td><td>144.47</td></tr><tr className="ours-row"><td>V-RAE · EUPE <span className="mini-ours">ours</span></td><td>29.29</td><td><b>224.60</b></td><td><b>11.52</b></td><td><b>111.36</b></td></tr></tbody></table></div>
           <FindingBlock index="04" title="Semantic latents form a directly decodable predictive state space." copy="A predictor learns transitions between semantic states, while the same frozen decoder renders predicted states into pixels, unifying future-state prediction and visual reconstruction within a single latent interface." />
